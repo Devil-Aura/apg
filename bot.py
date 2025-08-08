@@ -12,7 +12,7 @@ def fetch_anime_details(title):
         if response.get('data'):
             anime = response['data'][0]
             return {
-                'ratings': str(round(anime['score'], 2)) if anime['score'] else "N/A",
+                'ratings': str(round(anime['score'], 1)) if anime['score'] else "N/A",
                 'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),  # Increased to 6 genres
                 'episodes': str(anime['episodes']) if anime['episodes'] else "N/A"
             }

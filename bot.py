@@ -1,13 +1,12 @@
 import re
 import requests
-from telegram import Update, InputMediaPhoto
+from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# Bot Token (Replace with yours)
-TOKEN = ""
+TOKEN = ""  # Replace with your bot token
 
-# Fetch anime details from MyAnimeList API
 def fetch_anime_details(title):
+    """Fetch ratings, genres and episodes (but keep original title)"""
     try:
         url = f"https://api.jikan.moe/v4/anime?q={title}&limit=1"
         response = requests.get(url).json()
@@ -15,106 +14,132 @@ def fetch_anime_details(title):
         if response.get('data'):
             anime = response['data'][0]
             return {
-                'title': anime['title'],
-                'ratings': anime['score'] or "N/A",
-                'genres': ", ".join([g['name'] for g in anime['genres']]),
-                'episodes': anime['episodes'] or "N/A"
+                'ratings': str(round(anime['score'], 2)) if anime['score'] else "N/A",
+                'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),
+                'episodes': str(anime['episodes']) if anime['episodes'] else "N/A"
             }
-    except:
-        return None
+    except Exception as e:
+        print(f"API Error: {e}")
+    return None
 
-# Generate Main Post (with watch link)
-def generate_main_post(anime_details, watch_link):
+def generate_main_post(details, watch_link):
+    """Generate the main post with perfect formatting"""
     return f"""
-⛩ {anime_details['title']} [{anime_details['season']}]
+⛩ {details['title']} [{details['season']}]
 ╭───────────────────
-├ ✨ Ratings - {anime_details.get('ratings', 'N/A')} IMDB
-├ ❄️ Season - {anime_details['season'].replace('S', '')}
-├ ⚡️ Episodes - {anime_details.get('episodes', 'N/A')}
+├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
+├ ❄️ Season - {details['season'].replace('S', '')}
+├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
 ├ 🔈 Audio - Hindi #Official 
 ├ 📸 Quality - Multi 
-├ 🎭 Genres - {anime_details.get('genres', 'Action, Comedy, Slice of Life, Supernatural')}
+├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
-├ ⭕️ [Watch & Download]({watch_link}) ⭕️ 
+├[⭕️ Watch & Download ⭕️]({watch_link})
 ╰──────────────────
 New Anime In Official Hindi Dub 🔥
 """.strip()
 
-# Generate Powered By Post (fixed @CrunchyRollChannel)
-def generate_powered_by_post(anime_details):
+def generate_powered_by_post(details):
+    """Generate the 'Powered By' post"""
     return f"""
-⛩ {anime_details['title']} [{anime_details['season']}]
+⛩ {details['title']} [{details['season']}]
 ╭───────────────────
-├ ✨ Ratings - {anime_details.get('ratings', 'N/A')} IMDB
-├ ❄️ Season - {anime_details['season'].replace('S', '')} 
-├ ⚡️ Episodes - {anime_details.get('episodes', 'N/A')}
+├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
+├ ❄️ Season - {details['season'].replace('S', '')} 
+├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
 ├ 🔈 Audio - Hindi #Official 
 ├ 📸 Quality - Multi 
-├ 🎭 Genres - {anime_details.get('genres', 'Action, Comedy, Slice of Life, Supernatural')}
+├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
-• 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆: @CrunchyRollChannel
+• Powered By:
+@CrunchyRollChannel
 """.strip()
 
-# Handle /anime command
 def anime_command(update: Update, context: CallbackContext):
     try:
+        # Command format: /anime <Title> <Season> <WatchLink>
         args = context.args
         if len(args) < 3:
-            raise ValueError("Missing arguments. Usage: /anime <Title> <Season> <WatchLink>")
-        
-        title = ' '.join(args[:-2])
-        season = args[-2]
-        watch_link = args[-1]
-        
+            update.message.reply_text("❌ Usage: /anime <Title> <Season> <WatchLink>\nExample: /anime \"Demon Slayer\" S02 https://t.me/DemonSlayerHD")
+            return
+
+        title = ' '.join(args[:-2])  # Keep original title
+        season = args[-2].upper()    # Format season as S01, S02 etc.
+        watch_link = args[-1]        # Watch/download link
+
         if not re.match(r'^S\d+$', season, re.IGNORECASE):
-            raise ValueError("❌ Season must be in format: S01, S02, etc.")
-        
-        anime_details = {'title': title, 'season': season.upper()}
+            update.message.reply_text("❌ Season must be in format: S01, S02, etc.")
+            return
+
+        details = {
+            'title': title,
+            'season': season,
+            'ratings': 'N/A',
+            'episodes': 'N/A',
+            'genres': 'Action, Comedy, Supernatural'
+        }
+
+        # Fetch additional details (except title)
         fetched_data = fetch_anime_details(title)
         if fetched_data:
-            anime_details.update(fetched_data)
-        
-        main_post = generate_main_post(anime_details, watch_link)
-        powered_post = generate_powered_by_post(anime_details)
-        
+            details.update(fetched_data)
+
+        # Generate both posts
+        main_post = generate_main_post(details, watch_link)
+        powered_post = generate_powered_by_post(details)
+
+        # Send with thumbnail if provided
         if update.message.photo:
-            photo = update.message.photo[-1].get_file()
+            photo = update.message.photo[-1].file_id
             update.message.reply_photo(
-                photo=photo.file_id,
+                photo=photo,
                 caption=main_post,
                 parse_mode="Markdown"
             )
+        else:
             update.message.reply_text(
-                powered_post,
+                main_post,
                 parse_mode="Markdown"
             )
-        else:
-            update.message.reply_text(main_post, parse_mode="Markdown")
-            update.message.reply_text(powered_post, parse_mode="Markdown")
-            
-    except Exception as e:
-        update.message.reply_text(f"❌ Error: {str(e)}\n\nUsage:\n/anime <Title> <Season> <WatchLink>\nExample:\n/anime \"Attack on Titan\" S04 https://t.me/AOT_Hindi")
+        
+        # Always send powered by post
+        update.message.reply_text(
+            powered_post,
+            parse_mode="Markdown"
+        )
 
-# Start Command
+    except Exception as e:
+        update.message.reply_text(f"❌ Error: {str(e)}")
+
 def start(update: Update, context: CallbackContext):
+    """Help menu"""
     help_text = """
 🎌 *Anime Post Generator Bot* 🎌
 
 📌 *Commands:*
-- `/anime <Title> <Season> <WatchLink>` - Create anime post  
-  (Example: `/anime "Naruto" S01 https://t.me/AnimeLinks`)  
-- `/help` - Show this message  
+- /anime "<Title>" <Season> <WatchLink>  
+  Example:  
+  `/anime "Attack on Titan" S04 https://t.me/AOT_Hindi`
 
 📌 *Features:*
-✔ Auto-fetches ratings & genres  
-✔ Supports thumbnails  
-✔ Clean, formatted posts  
-✔ Powered by @CrunchyRollChannel  
+✔ Uses *your exact title* (no auto-translation)  
+✔ Auto-fetches: Ratings • Genres • Episode count  
+✔ Perfect formatting with emojis ⭕️🔥👑  
+✔ Supports thumbnails (attach image)  
+✔ Generates both main post + "Powered By" post  
+✔ Error-resistant design  
+
+📌 *Post Formatting:*
+- Clean box borders (╭ ─ ╮)  
+- Proper Markdown links  
+- Consistent spacing  
+- "Powered By" positioned correctly  
+- Watch link with ⭕️ emojis  
 """
     update.message.reply_text(help_text, parse_mode="Markdown")
 
-# Main Bot Setup
 def main():
+    """Start the bot"""
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     
@@ -122,9 +147,9 @@ def main():
     dp.add_handler(CommandHandler("help", start))
     dp.add_handler(CommandHandler("anime", anime_command, pass_args=True))
     
+    print("🤖 Bot is running...")
     updater.start_polling()
     updater.idle()
 
 if __name__ == "__main__":
-    print("Bot is running...")
     main()

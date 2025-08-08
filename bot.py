@@ -13,7 +13,7 @@ def fetch_anime_details(title):
             anime = response['data'][0]
             return {
                 'ratings': str(round(anime['score'], 2)) if anime['score'] else "N/A",
-                'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),
+                'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),  # Increased to 6 genres
                 'episodes': str(anime['episodes']) if anime['episodes'] else "N/A"
             }
     except Exception as e:
@@ -21,8 +21,9 @@ def fetch_anime_details(title):
     return None
 
 def generate_main_post(details, watch_link):
-    quoted_part = f"""
-╭───────────────────
+    return f"""
+<b>⛩ {details['title']} [{details['season']}]</b> 
+<b>╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')}
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
@@ -30,38 +31,29 @@ def generate_main_post(details, watch_link):
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
-├[⭕️ Watch & Download ⭕️]({watch_link})
-╰──────────────────
-""".strip()
-    
-    return f"""
-*⛩ {details['title']} [{details['season']}]*
-<blockquote>{quoted_part}</blockquote>
-*New Anime In Official Hindi Dub 🔥*
+├ ⭕️ <a href="{watch_link}">Watch & Download</a> ⭕️
+╰──────────────────</b>
+<b>New Anime In Official Hindi Dub 🔥</b>
 """.strip()
 
 def generate_powered_by_post(details):
-    quoted_part = f"""
-╭───────────────────
+    return f"""
+<b>⛩ {details['title']} [{details['season']}]</b>
+<b>╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')} 
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
 ├ 🔈 Audio - Hindi #Official 
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
-├───────────────────
-""".strip()
-    
-    return f"""
-*⛩ {details['title']} [{details['season']}]*
-<blockquote>{quoted_part}</blockquote>
-*Powered By:
-@CrunchyRollChannel*
+╰───────────────────</b>
+<b>Powered By: 
+@CrunchyRollChannel</b>
 """.strip()
 
 def anime_command(update: Update, context: CallbackContext):
     try:
-        # Check if replying to a thumbnail
+        # Check if replying to thumbnail
         if not update.message.reply_to_message or not update.message.reply_to_message.photo:
             update.message.reply_text("❌ Please reply to a thumbnail image with your command!")
             return
@@ -84,32 +76,26 @@ def anime_command(update: Update, context: CallbackContext):
             'season': season,
             'ratings': 'N/A',
             'episodes': 'N/A',
-            'genres': 'Action, Comedy, Supernatural'
+            'genres': 'Action, Comedy, Supernatural'  # Default if API fails
         }
 
+        # Fetch details (will update genres up to 6 if available)
         fetched_data = fetch_anime_details(title)
         if fetched_data:
             details.update(fetched_data)
 
-        # Get the thumbnail from replied message
         thumbnail = update.message.reply_to_message.photo[-1].file_id
 
-        # Generate posts
-        main_post = generate_main_post(details, watch_link)
-        powered_post = generate_powered_by_post(details)
-
-        # Send main post with thumbnail
+        # Send both posts with thumbnails
         update.message.reply_photo(
             photo=thumbnail,
-            caption=main_post,
-            parse_mode="Markdown"
+            caption=generate_main_post(details, watch_link),
+            parse_mode="HTML"
         )
-        
-        # Send powered by post WITH thumbnail
         update.message.reply_photo(
             photo=thumbnail,
-            caption=powered_post,
-            parse_mode="Markdown"
+            caption=generate_powered_by_post(details),
+            parse_mode="HTML"
         )
 
     except Exception as e:
@@ -117,27 +103,22 @@ def anime_command(update: Update, context: CallbackContext):
 
 def start(update: Update, context: CallbackContext):
     help_text = """
-🎌 *Anime Post Generator Bot* 🎌
+<b>🎌 Anime Post Generator Bot 🎌</b>
 
-📌 *How to Use:*
-1. Send your thumbnail image
-2. *Reply* to that image with:
-   `/anime "<Title>" <Season> <WatchLink>`
-   
-Example:
-1. Send a photo
-2. Reply to it with:
-   `/anime "Attack on Titan" S04 https://t.me/AOT_Hindi`
+<b>📌 How to Use:</b>
+1. Send thumbnail image
+2. Reply with:
+   <code>/anime "Title" S01 https://t.me/link</code>
 
-📌 *Features:*
-✔ Thumbnail on BOTH posts
-✔ Clickable watch/download link
-✔ Perfect quoted formatting
-✔ Auto-fetches ratings/genres
-✔ Bold text (except links)
-✔ Two-post system (Main + Powered By)
+<b>📌 Features:</b>
+✔ Thumbnail on both posts
+✔ Up to 6 genres
+✔ Bold HTML formatting
+✔ Safe clickable links
+✔ Auto-fetched details
+✔ Clean box formatting
 """
-    update.message.reply_text(help_text, parse_mode="Markdown")
+    update.message.reply_text(help_text, parse_mode="HTML")
 
 def main():
     updater = Updater(TOKEN, use_context=True)

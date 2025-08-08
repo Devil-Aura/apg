@@ -22,7 +22,7 @@ def fetch_anime_details(title):
 
 def generate_main_post(details, watch_link):
     quoted_part = f"""
-*╭───────────────────
+╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')}
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
@@ -31,32 +31,30 @@ def generate_main_post(details, watch_link):
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
 ├[⭕️ Watch & Download ⭕️]({watch_link})
-╰──────────────────*
+╰──────────────────
 """.strip()
     
     return f"""
 *⛩ {details['title']} [{details['season']}]*
-`{quoted_part}`
-*New Anime In Official Hindi Dub* 🔥
+<blockquote>{quoted_part}</blockquote>
+*New Anime In Official Hindi Dub 🔥*
 """.strip()
 
 def generate_powered_by_post(details):
     quoted_part = f"""
-*╭───────────────────
+╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')} 
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
 ├ 🔈 Audio - Hindi #Official 
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
-├───────────────────*
+├───────────────────
 """.strip()
     
     return f"""
 *⛩ {details['title']} [{details['season']}]*
-
-`{quoted_part}`
-
+<blockquote>{quoted_part}</blockquote>
 *Powered By:
 @CrunchyRollChannel*
 """.strip()
@@ -96,7 +94,7 @@ def anime_command(update: Update, context: CallbackContext):
         # Get the thumbnail from replied message
         thumbnail = update.message.reply_to_message.photo[-1].file_id
 
-        # Generate and send posts
+        # Generate posts
         main_post = generate_main_post(details, watch_link)
         powered_post = generate_powered_by_post(details)
 
@@ -107,9 +105,10 @@ def anime_command(update: Update, context: CallbackContext):
             parse_mode="Markdown"
         )
         
-        # Send powered by post
-        update.message.reply_text(
-            powered_post,
+        # Send powered by post WITH thumbnail
+        update.message.reply_photo(
+            photo=thumbnail,
+            caption=powered_post,
             parse_mode="Markdown"
         )
 
@@ -131,7 +130,7 @@ Example:
    `/anime "Attack on Titan" S04 https://t.me/AOT_Hindi`
 
 📌 *Features:*
-✔ Thumbnail support (must reply to image)
+✔ Thumbnail on BOTH posts
 ✔ Clickable watch/download link
 ✔ Perfect quoted formatting
 ✔ Auto-fetches ratings/genres

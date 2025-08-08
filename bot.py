@@ -31,7 +31,7 @@ def generate_main_post(details, watch_link):
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
-├ ⭕️ <a href="{watch_link}">Watch & Download</a> ⭕️
+├<a href="{watch_link}">⭕️ Watch & Download ⭕️</a> 
 ╰──────────────────</b>
 <b>New Anime In Official Hindi Dub 🔥</b>
 """.strip()
@@ -47,7 +47,7 @@ def generate_powered_by_post(details):
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ╰───────────────────</b>
-<b>Powered By: 
+<b>• 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆: 
 @CrunchyRollChannel</b>
 """.strip()
 

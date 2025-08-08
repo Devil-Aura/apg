@@ -3,14 +3,12 @@ import requests
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-TOKEN = ""  # Replace with your bot token
+TOKEN = ""
 
 def fetch_anime_details(title):
-    """Fetch ratings, genres and episodes (but keep original title)"""
     try:
         url = f"https://api.jikan.moe/v4/anime?q={title}&limit=1"
         response = requests.get(url).json()
-        
         if response.get('data'):
             anime = response['data'][0]
             return {
@@ -23,10 +21,8 @@ def fetch_anime_details(title):
     return None
 
 def generate_main_post(details, watch_link):
-    """Generate the main post with perfect formatting"""
-    return f"""
-⛩ {details['title']} [{details['season']}]
-╭───────────────────
+    quoted_part = f"""
+*╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')}
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
@@ -35,40 +31,54 @@ def generate_main_post(details, watch_link):
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
 ├───────────────────
 ├[⭕️ Watch & Download ⭕️]({watch_link})
-╰──────────────────
-New Anime In Official Hindi Dub 🔥
+╰──────────────────*
+""".strip()
+    
+    return f"""
+*⛩ {details['title']} [{details['season']}]*
+`{quoted_part}`
+*New Anime In Official Hindi Dub* 🔥
 """.strip()
 
 def generate_powered_by_post(details):
-    """Generate the 'Powered By' post"""
-    return f"""
-⛩ {details['title']} [{details['season']}]
-╭───────────────────
+    quoted_part = f"""
+*╭───────────────────
 ├ ✨ Ratings - {details.get('ratings', 'N/A')} IMDB
 ├ ❄️ Season - {details['season'].replace('S', '')} 
 ├ ⚡️ Episodes - {details.get('episodes', 'N/A')}
 ├ 🔈 Audio - Hindi #Official 
 ├ 📸 Quality - Multi 
 ├ 🎭 Genres - {details.get('genres', 'Action, Comedy, Supernatural')}
-├───────────────────
-• Powered By:
-@CrunchyRollChannel
+├───────────────────*
+""".strip()
+    
+    return f"""
+*⛩ {details['title']} [{details['season']}]*
+
+`{quoted_part}`
+
+*Powered By:
+@CrunchyRollChannel*
 """.strip()
 
 def anime_command(update: Update, context: CallbackContext):
     try:
-        # Command format: /anime <Title> <Season> <WatchLink>
-        args = context.args
-        if len(args) < 3:
-            update.message.reply_text("❌ Usage: /anime <Title> <Season> <WatchLink>\nExample: /anime \"Demon Slayer\" S02 https://t.me/DemonSlayerHD")
+        # Check if replying to a thumbnail
+        if not update.message.reply_to_message or not update.message.reply_to_message.photo:
+            update.message.reply_text("❌ Please reply to a thumbnail image with your command!")
             return
 
-        title = ' '.join(args[:-2])  # Keep original title
-        season = args[-2].upper()    # Format season as S01, S02 etc.
-        watch_link = args[-1]        # Watch/download link
+        args = context.args
+        if len(args) < 3:
+            update.message.reply_text("❌ Usage: Reply to thumbnail with:\n/anime <Title> <Season> <WatchLink>\nExample: /anime \"Demon Slayer\" S02 https://t.me/DemonSlayerHD")
+            return
+
+        title = ' '.join(args[:-2])
+        season = args[-2].upper()
+        watch_link = args[-1]
 
         if not re.match(r'^S\d+$', season, re.IGNORECASE):
-            update.message.reply_text("❌ Season must be in format: S01, S02, etc.")
+            update.message.reply_text("❌ Season format must be like S01, S02, etc.")
             return
 
         details = {
@@ -79,30 +89,25 @@ def anime_command(update: Update, context: CallbackContext):
             'genres': 'Action, Comedy, Supernatural'
         }
 
-        # Fetch additional details (except title)
         fetched_data = fetch_anime_details(title)
         if fetched_data:
             details.update(fetched_data)
 
-        # Generate both posts
+        # Get the thumbnail from replied message
+        thumbnail = update.message.reply_to_message.photo[-1].file_id
+
+        # Generate and send posts
         main_post = generate_main_post(details, watch_link)
         powered_post = generate_powered_by_post(details)
 
-        # Send with thumbnail if provided
-        if update.message.photo:
-            photo = update.message.photo[-1].file_id
-            update.message.reply_photo(
-                photo=photo,
-                caption=main_post,
-                parse_mode="Markdown"
-            )
-        else:
-            update.message.reply_text(
-                main_post,
-                parse_mode="Markdown"
-            )
+        # Send main post with thumbnail
+        update.message.reply_photo(
+            photo=thumbnail,
+            caption=main_post,
+            parse_mode="Markdown"
+        )
         
-        # Always send powered by post
+        # Send powered by post
         update.message.reply_text(
             powered_post,
             parse_mode="Markdown"
@@ -112,34 +117,30 @@ def anime_command(update: Update, context: CallbackContext):
         update.message.reply_text(f"❌ Error: {str(e)}")
 
 def start(update: Update, context: CallbackContext):
-    """Help menu"""
     help_text = """
 🎌 *Anime Post Generator Bot* 🎌
 
-📌 *Commands:*
-- /anime "<Title>" <Season> <WatchLink>  
-  Example:  
-  `/anime "Attack on Titan" S04 https://t.me/AOT_Hindi`
+📌 *How to Use:*
+1. Send your thumbnail image
+2. *Reply* to that image with:
+   `/anime "<Title>" <Season> <WatchLink>`
+   
+Example:
+1. Send a photo
+2. Reply to it with:
+   `/anime "Attack on Titan" S04 https://t.me/AOT_Hindi`
 
 📌 *Features:*
-✔ Uses *your exact title* (no auto-translation)  
-✔ Auto-fetches: Ratings • Genres • Episode count  
-✔ Perfect formatting with emojis ⭕️🔥👑  
-✔ Supports thumbnails (attach image)  
-✔ Generates both main post + "Powered By" post  
-✔ Error-resistant design  
-
-📌 *Post Formatting:*
-- Clean box borders (╭ ─ ╮)  
-- Proper Markdown links  
-- Consistent spacing  
-- "Powered By" positioned correctly  
-- Watch link with ⭕️ emojis  
+✔ Thumbnail support (must reply to image)
+✔ Clickable watch/download link
+✔ Perfect quoted formatting
+✔ Auto-fetches ratings/genres
+✔ Bold text (except links)
+✔ Two-post system (Main + Powered By)
 """
     update.message.reply_text(help_text, parse_mode="Markdown")
 
 def main():
-    """Start the bot"""
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     

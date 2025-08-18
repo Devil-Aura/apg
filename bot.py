@@ -1,11 +1,12 @@
 import re
 import requests
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes
+from telegram.ext import filters  # Lowercase 'filters' in v20+
 
-TOKEN = ""
+TOKEN = ""  # Replace with your actual token
 
-def fetch_anime_details(title):
+async def fetch_anime_details(title):
     try:
         url = f"https://api.jikan.moe/v4/anime?q={title}&limit=1"
         response = requests.get(url).json()
@@ -13,7 +14,7 @@ def fetch_anime_details(title):
             anime = response['data'][0]
             return {
                 'ratings': str(round(anime['score'], 1)) if anime['score'] else "N/A",
-                'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),  # Increased to 6 genres
+                'genres': ", ".join([g['name'] for g in anime['genres'][:6]]),
                 'episodes': str(anime['episodes']) if anime['episodes'] else "N/A"
             }
     except Exception as e:
@@ -51,16 +52,16 @@ def generate_powered_by_post(details):
 @CrunchyRollChannel</b>
 """.strip()
 
-def anime_command(update: Update, context: CallbackContext):
+async def anime_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Check if replying to thumbnail
         if not update.message.reply_to_message or not update.message.reply_to_message.photo:
-            update.message.reply_text("❌ Please reply to a thumbnail image with your command!")
+            await update.message.reply_text("❌ Please reply to a thumbnail image with your command!")
             return
 
         args = context.args
         if len(args) < 3:
-            update.message.reply_text("❌ Usage: Reply to thumbnail with:\n/anime <Title> <Season> <WatchLink>\nExample: /anime \"Demon Slayer\" S02 https://t.me/DemonSlayerHD")
+            await update.message.reply_text("❌ Usage: Reply to thumbnail with:\n/anime <Title> <Season> <WatchLink>\nExample: /anime \"Demon Slayer\" S02 https://t.me/DemonSlayerHD")
             return
 
         title = ' '.join(args[:-2])
@@ -68,7 +69,7 @@ def anime_command(update: Update, context: CallbackContext):
         watch_link = args[-1]
 
         if not re.match(r'^S\d+$', season, re.IGNORECASE):
-            update.message.reply_text("❌ Season format must be like S01, S02, etc.")
+            await update.message.reply_text("❌ Season format must be like S01, S02, etc.")
             return
 
         details = {
@@ -76,34 +77,34 @@ def anime_command(update: Update, context: CallbackContext):
             'season': season,
             'ratings': 'N/A',
             'episodes': 'N/A',
-            'genres': 'Action, Comedy, Supernatural'  # Default if API fails
+            'genres': 'Action, Comedy, Supernatural'
         }
 
-        # Fetch details (will update genres up to 6 if available)
-        fetched_data = fetch_anime_details(title)
+        # Fetch details
+        fetched_data = await fetch_anime_details(title)
         if fetched_data:
             details.update(fetched_data)
 
         thumbnail = update.message.reply_to_message.photo[-1].file_id
 
-        # Send both posts with thumbnails
-        update.message.reply_photo(
+        # Send both posts
+        await update.message.reply_photo(
             photo=thumbnail,
             caption=generate_main_post(details, watch_link),
             parse_mode="HTML"
         )
-        update.message.reply_photo(
+        await update.message.reply_photo(
             photo=thumbnail,
             caption=generate_powered_by_post(details),
             parse_mode="HTML"
         )
 
     except Exception as e:
-        update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
-<b>🎌 Anime Post Generator Bot 🎌</b>
+<b>🎌 Anime Post Generator Bot �</b>
 
 <b>📌 How to Use:</b>
 1. Send thumbnail image
@@ -118,19 +119,17 @@ def start(update: Update, context: CallbackContext):
 ✔ Auto-fetched details
 ✔ Clean box formatting
 """
-    update.message.reply_text(help_text, parse_mode="HTML")
+    await update.message.reply_text(help_text, parse_mode="HTML")
 
 def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    app = Application.builder().token(TOKEN).build()
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", start))
-    dp.add_handler(CommandHandler("anime", anime_command, pass_args=True))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", start))
+    app.add_handler(CommandHandler("anime", anime_command))
     
     print("🤖 Bot is running...")
-    updater.start_polling()
-    updater.idle()
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
